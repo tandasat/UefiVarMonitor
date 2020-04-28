@@ -35,11 +35,50 @@ static UINTN g_CurrentPoision;
 static SPIN_LOCK g_VariableCallbacksLock;
 static VARIABLE_CALLBACK g_VariableCallbacks[8];
 
+
+#if defined(_MSC_VER)
 //
-// MSVC intrinsics for CR8 access.
+// MSVC compiler intrinsics for CR8 access.
 //
 UINTN __readcr8(VOID);
-VOID __writecr8(UINTN  Data);
+VOID __writecr8(UINTN Data);
+
+#elif defined(__GNUC__)
+//
+// Inline assemblies for CR8 access.
+//
+static
+__inline__
+__attribute__((always_inline))
+UINTN
+__readcr8 (
+    VOID
+    )
+{
+    UINTN value;
+
+    __asm__ __volatile__ (
+        "mov %%cr8, %[value]"
+        : [value] "=a" (value)
+    );
+    return value;
+}
+
+static
+__inline__
+__attribute__((always_inline))
+VOID
+__writecr8 (
+    UINTN Data
+    )
+{
+    __asm__ __volatile__ (
+        "mov %%eax, %%cr8"
+        :
+        : "a" (Data)
+    );
+}
+#endif
 
 /**
  * @brief Disables low-priority interrupts and acquires the spin lock,

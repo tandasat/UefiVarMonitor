@@ -43,8 +43,10 @@ typedef enum _OPERATION_TYPE
 //
 // The single log entry type in the log buffer.
 //
+#if defined(_MSC_VER)
 #pragma warning(push)
 #pragma warning(disable: 4200)
+#endif
 typedef struct _VARIABLE_LOG_ENTRY
 {
     CHAR16 VariableName[64];
@@ -56,7 +58,9 @@ typedef struct _VARIABLE_LOG_ENTRY
     UINTN DataSize;
     UINT8 Data[0];
 } VARIABLE_LOG_ENTRY;
+#if defined(_MSC_VER)
 #pragma warning(pop)
+#endif
 
 //
 // The parameter type of the Get/SetVariable service callback.

@@ -37,7 +37,13 @@ Building
     2. Copy `UefiVarMonitorPkg` as `edk2\UefiVarMonitorPkg`
     3. On the edk2 build command prompt, run the below command:
         ```
-        >build -t VS2019 -a X64 -b NOOPT -p UefiVarMonitorPkg\UefiVarMonitorPkg.dsc -D DEBUG_ON_SERIAL_PORT
+        > edksetup.bat
+        > build -t VS2019 -a X64 -b NOOPT -p UefiVarMonitorPkg\UefiVarMonitorPkg.dsc -D DEBUG_ON_SERIAL_PORT
+        ```
+       Or on WSL,
+        ```
+        $ . edksetup.sh
+        $ build -t GCC5 -a X64 -b NOOPT -p UefiVarMonitorPkg/UefiVarMonitorPkg.dsc -D DEBUG_ON_SERIAL_PORT
         ```
 
 * uefi-var-monitor
@@ -49,9 +55,9 @@ Building
         ```
     3. Override `/subsystem` via the `RUSTFLAGS` environnement variables and build the project.
         ```
-        >cd uefi-var-monitor
-        >set RUSTFLAGS=-Z pre-link-args=/subsystem:efi_runtime_driver
-        >cargo xbuild --target x86_64-unknown-uefi
+        > cd uefi-var-monitor
+        > set RUSTFLAGS=-Z pre-link-args=/subsystem:efi_runtime_driver
+        > cargo xbuild --target x86_64-unknown-uefi
         ```
 
 * UefiVarMonitorExClient
