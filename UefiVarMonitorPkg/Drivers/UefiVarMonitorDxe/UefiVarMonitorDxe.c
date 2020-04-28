@@ -180,6 +180,7 @@ Cleanup (
     {
         status = gBS->CloseEvent(&g_SetVaMapEvent);
         ASSERT_EFI_ERROR(status);
+        g_SetVaMapEvent = NULL;
     }
 }
 

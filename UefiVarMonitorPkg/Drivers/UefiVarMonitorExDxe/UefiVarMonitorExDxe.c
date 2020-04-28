@@ -694,12 +694,14 @@ Cleanup (
     if (g_SetVaMapEvent != NULL)
     {
         status = gBS->CloseEvent(&g_SetVaMapEvent);
+        g_SetVaMapEvent = NULL;
         ASSERT_EFI_ERROR(status);
     }
 
     if (g_LogBuffer != NULL)
     {
         FreePages(g_LogBuffer, RUNTIME_BUFFER_SIZE_IN_PAGES);
+        g_LogBuffer = NULL;
     }
 }
 
