@@ -36,19 +36,23 @@ extern "win64" fn handle_get_variable(
     //
     // Convert to UTF-8 form USC-2 up to 64 characters.
     //
-    let mut var_name_buffer = [0; 64];
-    let mut i: usize = 0;
-    while i < var_name_buffer.len() {
-        unsafe {
-            var_name_buffer[i] =
-                (*(((variable_name as u64) + (2 * i as u64)) as *const u16) & 0xffu16) as u8;
+    let mut name;
+    let name = unsafe {
+        let variable_name = core::slice::from_raw_parts(variable_name, 64);
+        name = core::mem::MaybeUninit::<[u8; 64]>::uninit();
+        let name_ptr = name.as_mut_ptr() as *mut u8;
+        let mut offset = 0;
+        for c in variable_name
+            .iter()
+            .take_while(|&&c| c != 0)
+            .map(|&c| c as u8)
+        {
+            name_ptr.add(offset).write(c);
+            offset = offset + 1;
         }
-        if var_name_buffer[i] == 0 {
-            break;
-        }
-        i += 1;
-    }
-    let name = unsafe { core::str::from_utf8_unchecked(&var_name_buffer) };
+        core::str::from_utf8_unchecked(core::slice::from_raw_parts(name_ptr, offset))
+    };
+
     let effective_size = if data_size.is_null() {
         0
     } else {
