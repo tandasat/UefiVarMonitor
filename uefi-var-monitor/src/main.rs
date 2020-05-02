@@ -15,7 +15,6 @@ type GetVariableType = extern "win64" fn(
 ) -> r_efi::base::Status;
 
 static mut GET_VARIABLE: GetVariableType = handle_get_variable;
-static mut RUNTIME: *mut r_efi::efi::RuntimeServices = core::ptr::null_mut();
 
 /**
  * @brief Handles GetVariable runtime service calls.
@@ -85,22 +84,21 @@ extern "win64" fn handle_get_variable(
  */
 extern "win64" fn handle_set_virtual_address_map(
     _event: r_efi::base::Event,
-    _context: *mut core::ffi::c_void,
+    context: *mut core::ffi::c_void,
 ) {
-    let current = unsafe { GET_VARIABLE };
-    let efi_status = unsafe {
-        ((*RUNTIME).convert_pointer)(
-            0,
-            &mut GET_VARIABLE as *mut _ as *mut *mut core::ffi::c_void,
-        )
-    };
-    unsafe {
-        log!(
-            "GetVariable relocated from {:#08x} to {:#08x}",
-            current as u64,
-            GET_VARIABLE as u64,
-        );
-    }
+    assert!(!context.is_null());
+
+    let runtime_services = unsafe { &mut *(context as *mut r_efi::efi::RuntimeServices) };
+    let curr_addr = unsafe { GET_VARIABLE as u64 };
+    let efi_status = (runtime_services.convert_pointer)(0, unsafe {
+        &mut GET_VARIABLE as *mut _ as *mut *mut core::ffi::c_void
+    });
+    log!(
+        "GetVariable relocated from {:#08x} to {:#08x}",
+        curr_addr,
+        unsafe { GET_VARIABLE as u64 },
+    );
+
     assert!(!efi_status.is_error());
 }
 
@@ -113,12 +111,17 @@ fn exchange_pointer_in_service_table(
     new_function_pointer: *mut core::ffi::c_void,
     original_function_pointer: *mut *mut core::ffi::c_void,
 ) -> efi::Status {
-    unsafe { assert!(*address_to_update != new_function_pointer) };
+    unsafe {
+        assert!(!system_table.is_null());
+        assert!(*address_to_update != new_function_pointer);
+    };
+    let system_table = unsafe { &mut *system_table };
+    let boot_services = unsafe { &mut *system_table.boot_services };
 
     //
     // Disable interrupt.
     //
-    let tpl = unsafe { ((*(*system_table).boot_services).raise_tpl)(efi::TPL_HIGH_LEVEL) };
+    let tpl = (boot_services.raise_tpl)(efi::TPL_HIGH_LEVEL);
 
     unsafe {
         *original_function_pointer = *address_to_update;
@@ -128,17 +131,15 @@ fn exchange_pointer_in_service_table(
     //
     // Update the CRC32 in the EFI System Table header.
     //
-    unsafe { (*system_table).hdr.crc32 = 0 };
-    let efi_status = unsafe {
-        ((*(*system_table).boot_services).calculate_crc32)(
-            &mut (*system_table).hdr as *mut _ as *mut core::ffi::c_void,
-            (*system_table).hdr.header_size as usize,
-            &mut (*system_table).hdr.crc32,
-        )
-    };
+    system_table.hdr.crc32 = 0;
+    let efi_status = (boot_services.calculate_crc32)(
+        &mut system_table.hdr as *mut _ as *mut core::ffi::c_void,
+        system_table.hdr.header_size as usize,
+        &mut system_table.hdr.crc32,
+    );
     assert!(!efi_status.is_error());
 
-    unsafe { ((*(*system_table).boot_services).restore_tpl)(tpl) };
+    (boot_services.restore_tpl)(tpl);
     return efi_status;
 }
 
@@ -147,27 +148,26 @@ fn exchange_pointer_in_service_table(
  */
 #[no_mangle]
 fn efi_main(_image_handle: efi::Handle, system_table: *mut efi::SystemTable) -> efi::Status {
-    log!("Driver being loaded");
+    assert!(!system_table.is_null());
+    let system_table = unsafe { &mut *system_table };
 
-    unsafe {
-        RUNTIME = (*system_table).runtime_services;
-    };
-    let boot_services = unsafe { (*system_table).boot_services };
+    assert!(!system_table.boot_services.is_null());
+    let boot_services = unsafe { &mut *system_table.boot_services };
+
+    log!("Driver being loaded");
 
     //
     // Register a notification for SetVirtualAddressMap call.
     //
     let mut event: r_efi::base::Event = core::ptr::null_mut();
-    let mut efi_status = unsafe {
-        ((*boot_services).create_event_ex)(
-            r_efi::efi::EVT_NOTIFY_SIGNAL,
-            r_efi::efi::TPL_CALLBACK,
-            handle_set_virtual_address_map,
-            core::ptr::null_mut(),
-            &mut r_efi::efi::EVENT_GROUP_VIRTUAL_ADDRESS_CHANGE,
-            &mut event,
-        )
-    };
+    let mut efi_status = (boot_services.create_event_ex)(
+        r_efi::efi::EVT_NOTIFY_SIGNAL,
+        r_efi::efi::TPL_CALLBACK,
+        handle_set_virtual_address_map,
+        system_table.runtime_services as *mut core::ffi::c_void,
+        &mut r_efi::efi::EVENT_GROUP_VIRTUAL_ADDRESS_CHANGE,
+        &mut event,
+    );
     if efi_status.is_error() {
         log!("create_event_ex failed : {:#x}", efi_status.as_usize());
         return efi_status;
@@ -179,7 +179,7 @@ fn efi_main(_image_handle: efi::Handle, system_table: *mut efi::SystemTable) -> 
     efi_status = unsafe {
         exchange_pointer_in_service_table(
             system_table,
-            &mut (*(*system_table).runtime_services).get_variable as *mut _
+            &mut (*system_table.runtime_services).get_variable as *mut _
                 as *mut *mut core::ffi::c_void,
             handle_get_variable as *mut core::ffi::c_void,
             &mut GET_VARIABLE as *mut _ as *mut *mut core::ffi::c_void,
@@ -190,7 +190,7 @@ fn efi_main(_image_handle: efi::Handle, system_table: *mut efi::SystemTable) -> 
             "exchange_table_pointer failed : {:#x}",
             efi_status.as_usize()
         );
-        unsafe { ((*boot_services).close_event)(event) };
+        (boot_services.close_event)(event);
         return efi_status;
     }
 
