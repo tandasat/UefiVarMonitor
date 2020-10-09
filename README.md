@@ -6,6 +6,7 @@ The sample runtime DXE driver (UEFI driver) monitoring access to the UEFI variab
 This project was developed to provide a small sample of a runtime driver.
 
 ![UefiVarMonitor](Resources/UefiVarMonitor.png)
+![uefi-var-monitor](Resources/uefi-var-monitor-on-linux.png)
 
 Rust implementation was made solely for author's learning.
 
@@ -40,7 +41,7 @@ Building
         > edksetup.bat
         > build -t VS2019 -a X64 -b NOOPT -p UefiVarMonitorPkg\UefiVarMonitorPkg.dsc -D DEBUG_ON_SERIAL_PORT
         ```
-       Or on WSL,
+       Or on Linux or WSL,
         ```
         $ . edksetup.sh
         $ build -t GCC5 -a X64 -b NOOPT -p UefiVarMonitorPkg/UefiVarMonitorPkg.dsc -D DEBUG_ON_SERIAL_PORT
@@ -48,18 +49,23 @@ Building
 
 * uefi-var-monitor
 
-    1. Install the nightly rust compiler.
-    2. Install `cargo-xbuild`
+    1. Install the nightly rust compiler. Below is an example on Linux, but it is largely the same on Windows.
         ```
-        > cargo install cargo-xbuild
+        $ sudo snap install rustup --classic
+        $ rustup default nightly
+        $ rustup component add rust-src
         ```
-    3. Override `/subsystem` via the `RUSTFLAGS` environnement variables and build the project.
+    2. Build the project.
         ```
-        > cd uefi-var-monitor
-        > set RUSTFLAGS=-Z pre-link-args=/subsystem:efi_runtime_driver
-        > cargo xbuild --target x86_64-unknown-uefi
+        $ cd uefi-var-monitor
+        $ cargo build
         ```
 
 * UefiVarMonitorExClient
 
     This is a standard Windows driver. VS2019 and WDK 10.0.18362 or later are required.
+
+Credits
+---------
+
+- Thank you [@x1tan](https://twitter.com/x1tan) for modernalized xcargo-less build. 
